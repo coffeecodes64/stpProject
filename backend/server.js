@@ -125,6 +125,27 @@ app.post("/api/grocery-list", async (req, res) => {
   }
 });
 
+// In-memory ratings store (for demo; use DB in production)
+const recipeRatings = {};
+
+// Set a recipe rating
+app.post("/api/recipes/:id/rate", (req, res) => {
+  const { id } = req.params;
+  const { rating } = req.body;
+  if (!rating || rating < 1 || rating > 5) {
+    return res.status(400).json({ error: "Rating must be between 1 and 5" });
+  }
+  recipeRatings[id] = rating;
+  res.json({ success: true, rating });
+});
+
+// Get a recipe rating
+app.get("/api/recipes/:id/rating", (req, res) => {
+  const { id } = req.params;
+  const rating = recipeRatings[id] || null;
+  res.json({ rating });
+});
+
 // Health check endpoint
 app.get("/api/health", (req, res) => {
   res.json({ status: "OK", message: "Recipe Generator API is running" });
