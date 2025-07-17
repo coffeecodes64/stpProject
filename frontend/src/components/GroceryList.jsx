@@ -3,18 +3,46 @@ import { Plus, Check, X, ShoppingCart, Trash2 } from 'lucide-react';
 
 const GroceryList = ({ groceryList, setGroceryList }) => {
   const [newItem, setNewItem] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const addItem = () => {
-    if (newItem.trim()) {
-      const newGroceryItem = {
-        id: Date.now(),
-        name: newItem.trim(),
+  const addItem = async () => {
+    if (!newItem.trim()) return;
+    setError('');
+    setLoading(true);
+    try {
+      // Search for recipes by name
+      const searchRes = await fetch(`/api/recipes/search?ingredients=${encodeURIComponent(newItem.trim())}&number=1`);
+      const searchData = await searchRes.json();
+      const firstRecipe = searchData.results && searchData.results[0];
+      if (!firstRecipe) {
+        setError('No recipe found for that name.');
+        setLoading(false);
+        return;
+      }
+      // Fetch recipe details to get ingredients
+      const detailsRes = await fetch(`/api/recipes/${firstRecipe.id}`);
+      const detailsData = await detailsRes.json();
+      const ingredients = detailsData.extendedIngredients || [];
+      if (ingredients.length === 0) {
+        setError('No ingredients found for this recipe.');
+        setLoading(false);
+        return;
+      }
+      // Add each ingredient to the grocery list
+      const newItems = ingredients.map(ing => ({
+        id: Date.now() + Math.random(),
+        name: ing.original,
         checked: false
-      };
-      const updatedList = [...groceryList, newGroceryItem];
+      }));
+      const updatedList = [...groceryList, ...newItems];
       setGroceryList(updatedList);
       localStorage.setItem('groceryList', JSON.stringify(updatedList));
       setNewItem('');
+    } catch (err) {
+      setError('Failed to fetch recipe ingredients.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -76,17 +104,20 @@ const GroceryList = ({ groceryList, setGroceryList }) => {
           type="text"
           value={newItem}
           onChange={(e) => setNewItem(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="Add new item to grocery list..."
+          onKeyPress={(e) => { if (e.key === 'Enter') addItem(); }}
+          placeholder="Enter the recipe name to get grocery list..."
           className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/50 dark:bg-gray-700/50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+          disabled={loading}
         />
         <button
           onClick={addItem}
           className="px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 transition-colors shadow-md"
+          disabled={loading}
         >
-          <Plus className="w-5 h-5" />
+          {loading ? <span className="animate-spin">⏳</span> : <Plus className="w-5 h-5" />}
         </button>
       </div>
+      {error && <div className="text-red-500 mb-4">{error}</div>}
 
       {/* Progress Bar */}
       {totalItems > 0 && (
